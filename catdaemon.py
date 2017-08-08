@@ -87,9 +87,6 @@ class CatDaemon(Daemon):
 
     def send(self, dateString):
         data = '{ DeviceId: 7, EventDate: \'' +  dateString + '\' }'
-        print 'send to: ' + self.url
-        print 'api key: ' + self.apiKey
-        print 'json: ' + data
         
         req = urllib2.Request(self.url)
         req.add_header('Content-Type', 'application/json')

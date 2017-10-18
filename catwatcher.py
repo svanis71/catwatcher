@@ -16,11 +16,12 @@ if __name__ == "__main__":
     daemon.apiKey = config.get('WebService', 'apiKey')
     
     if len(sys.argv) == 2:
-        if 'start' == sys.argv[1]:
+        task = sys.argv[1]
+        if 'start' == task:
             daemon.start()
-        elif 'stop' == sys.argv[1]:
+        elif 'stop' == task:
             daemon.stop()
-        elif 'restart' == sys.argv[1]:
+        elif 'restart' == task:
             daemon.restart()
         else:
             print "Unknown command"

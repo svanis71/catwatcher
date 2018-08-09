@@ -1,8 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from datetime import datetime
 import sys, time, platform
-import json, urllib2
+import json
+import os
+import requests
+
 #imports allowing the use of our library
 from ctypes import c_int, c_ubyte, c_void_p, POINTER, string_at 
 from ctypes import cdll, CFUNCTYPE
@@ -16,58 +19,37 @@ lib = cdll.LoadLibrary('libtelldus-core.so.2')
 #CMPFUNC = CFUNCTYPE(None, c_int, c_int, POINTER(c_ubyte), c_int, c_void_p)
 
 class CatDaemon(Daemon):
-    num_leds = 0
-    last_event = ''
-    url = 'http://localhost/api/Doorbell'
-    apiKey = 'the key'
-
+    last_event = {'time': '', 'method': -1, 'deviceId': -1}
+    
     def __init___(self, pidfile, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
-        self.url = 'http://localhost/api/Doorbell'
-        self.apiKey = 'dummy key'
         super(CatDaemon, self).__init__(pidfile, stdin, stdout, stderr)
         
-    @property
-    def url(self):
-        return self.url
-    
-    @url.setter
-    def url(self, value):
-        self.url = value
-
-    @property
-    def apiKey(self):
-        return self.apiKey
-    
-    @apiKey.setter
-    def apiKey(self, value):
-        self.apiKey = value
-        
-    def set_leds(self):
-        self.num_leds += 1
-        for led in range(6):
-            backlight.graph_set_led_state(led, self.num_leds & (1 << led))
-    
     def callbackfunction(self, deviceId, method, value, callbackId, context):
         dt = datetime.now()
         sdt = dt.strftime('%Y-%m-%d %H:%M')
+        
         # For some reason the motion sensor sends the same event twice
-        if(sdt == self.last_event):
+        if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event['method']:
             return
-        self.last_event = sdt
-        if(deviceId == 7):
-            if(method == 1):
+        self.last_event['time'] = sdt
+        self.last_event['method'] = method
+        self.last_event['deviceId'] = deviceId
+        
+        if deviceId == 7:
+            if method == 1:
                 lcd.clear()
                 lcd.set_cursor_position(0, 0)
                 lcd.write(sdt)
-                backlight.rgb(0, 255, 0)
-                self.set_leds()
+                backlight.rgb(100, 255, 100)
                 self.send(sdt)
-                print sdt
-            if(method == 2):
-                lcd.set_cursor_position(0, 1)
-                lcd.write('Waiting...')
+            if method == 2:
+                lcd.clear()
                 backlight.off()
-            sys.stdout.flush()
+                lcd.set_cursor_position(0, 1)
+                lcd.write('Waiting for')
+                lcd.set_cursor_position(0, 2)
+                lcd.write('Smilla to knock')
+        sys.stdout.flush()
                     
     def run(self):
         CMPFUNC = CFUNCTYPE(None, c_int, c_int, POINTER(c_ubyte), c_int, c_void_p)
@@ -77,23 +59,34 @@ class CatDaemon(Daemon):
 
         lcd.clear()
         lcd.set_cursor_position(0, 1)
-        lcd.write('Waiting...')
+        lcd.write('Waiting for')
+        lcd.set_cursor_position(0, 2)
+        lcd.write('Smilla to knock')
         backlight.off()
         backlight.graph_off()
 
-        print 'Started'
+        print('Started')
         while True:
             time.sleep(1)
 
     def send(self, dateString):
-        data = '{ DeviceId: 7, EventDate: \'' +  dateString + '\' }'
-        print 'send to: ' + self.url
-        print 'api key: ' + self.apiKey
-        print 'json: ' + data
-        
-        req = urllib2.Request(self.url)
-        req.add_header('Content-Type', 'application/json')
-        req.add_header('X-ApiKey', self.apiKey)
-
-        response = urllib2.urlopen(req, data)
-    
+        fname = '/home/pi/code/catwatcher/config.json'
+        with open(fname, 'r') as f:
+            config = json.load(f)
+        url = config['WebService']['PostEventUrl']
+        rainbowurl = config['WebService']['RainbowHatUrl']
+        apiKey = config['Api']['Key']
+        sdt = dateString[0:10]
+        sdts = sdt + ' ' + dateString[11:17]+':00'
+        data = {'dateString': sdts}
+        headers = {
+            "Content-Type": "application/json",
+            "X-ApiKey": apiKey
+        }
+        req = requests.post(url=url, data=json.dumps(data), headers=headers)
+        if req.ok:
+            print('Event registered at ', sdts)
+        else:
+            print('Failed to post event at ', sdts)
+            print('Status: ', req.status_code)
+            print('Message: ', req.text)

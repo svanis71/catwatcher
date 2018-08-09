@@ -1,2 +1,6 @@
 *~
 *.pyc
+venv/
+*.out
+*.log
+config.json

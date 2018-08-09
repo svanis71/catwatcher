@@ -1,0 +1,13 @@
+{
+    "WebService": {
+	"PostEventUrl": "Placeholder for ws",
+	"RainbowHatUrl": "http://192.168.1.222/plingplong"
+    },
+    "Api": {
+	"Key": "Placeholder for api key"
+    },
+    "Logging": {
+	"stdout": "catlog.out",
+	"stderr": "catlog.err"
+    }
+}

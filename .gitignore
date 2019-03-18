@@ -4,3 +4,6 @@ venv/
 *.out
 *.log
 config.json
+*.out
+*.err
+__pycache__

@@ -10,8 +10,8 @@ import requests
 from ctypes import c_int, c_ubyte, c_void_p, POINTER, string_at 
 from ctypes import cdll, CFUNCTYPE
 # The Display-o-Tron HAT api
-import dothat.lcd as lcd
-import dothat.backlight as backlight
+import rainbowhat as rh
+
 # Generic Daemon
 from daemon import Daemon
 # Import the telldus api
@@ -25,8 +25,11 @@ class CatDaemon(Daemon):
         super(CatDaemon, self).__init__(pidfile, stdin, stdout, stderr)
         
     def callbackfunction(self, deviceId, method, value, callbackId, context):
+        disp = rh.display
+        leds = rh.rainbow
         dt = datetime.now()
         sdt = dt.strftime('%Y-%m-%d %H:%M')
+        int_time = int(dt.strftime('%H%M'))
         
         # For some reason the motion sensor sends the same event twice
         if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event['method']:
@@ -37,18 +40,15 @@ class CatDaemon(Daemon):
         
         if deviceId == 7:
             if method == 1:
-                lcd.clear()
-                lcd.set_cursor_position(0, 0)
-                lcd.write(sdt)
-                backlight.rgb(100, 255, 100)
+                disp.print_str('%04d' % int_time)
+                disp.set_decimal(1, True)
+                disp.show()
+                leds.clear()
+                leds.set_pixel(1, 0, 255, 0, 0.1)
                 self.send(sdt)
             if method == 2:
-                lcd.clear()
-                backlight.off()
-                lcd.set_cursor_position(0, 1)
-                lcd.write('Waiting for')
-                lcd.set_cursor_position(0, 2)
-                lcd.write('Smilla to knock')
+                leds.clear()
+            leds.show()
         sys.stdout.flush()
                     
     def run(self):
@@ -57,13 +57,8 @@ class CatDaemon(Daemon):
         lib.tdInit()
         lib.tdRegisterDeviceEvent(cmp_func, 0)
 
-        lcd.clear()
-        lcd.set_cursor_position(0, 1)
-        lcd.write('Waiting for')
-        lcd.set_cursor_position(0, 2)
-        lcd.write('Smilla to knock')
-        backlight.off()
-        backlight.graph_off()
+        leds = rh.rainbow
+        leds.clear()
 
         print('Started')
         while True:
@@ -77,8 +72,8 @@ class CatDaemon(Daemon):
         rainbowurl = config['WebService']['RainbowHatUrl']
         apiKey = config['Api']['Key']
         sdt = dateString[0:10]
-        sdts = sdt + ' ' + dateString[11:17]+':00'
-        data = {'dateString': sdts}
+        sdts = sdt + ' ' + dateString[11:17]
+        data = {'dateString': dateString}
         headers = {
             "Content-Type": "application/json",
             "X-ApiKey": apiKey

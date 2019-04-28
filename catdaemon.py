@@ -12,6 +12,9 @@ from ctypes import cdll, CFUNCTYPE
 # The Display-o-Tron HAT api
 import rainbowhat as rh
 
+from auth.authorize import authorize
+from config import DEVICES_URL, MYAPIKEY, APIKEY_HEADER
+
 # Generic Daemon
 from daemon import Daemon
 # Import the telldus api
@@ -20,6 +23,8 @@ lib = cdll.LoadLibrary('libtelldus-core.so.2')
 
 class CatDaemon(Daemon):
     last_event = {'time': '', 'method': -1, 'deviceId': -1}
+    token = ''
+    expiry_time = -1
     
     def __init___(self, pidfile, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
         super(CatDaemon, self).__init__(pidfile, stdin, stdout, stderr)
@@ -74,9 +79,17 @@ class CatDaemon(Daemon):
         sdt = dateString[0:10]
         sdts = sdt + ' ' + dateString[11:17]
         data = {'dateString': dateString}
+
+        now = datetime.now()
+        timestamp = now.timestamp()
+        if timestamp >= self.expiry_time:
+            print('Renew authorization token at', now)
+            self.token, self.expiry_time = authorize()
+        
         headers = {
             "Content-Type": "application/json",
-            "X-ApiKey": apiKey
+            "X-ApiKey": apiKey,
+            "Authorization": self.token
         }
         req = requests.post(url=url, data=json.dumps(data), headers=headers)
         if req.ok:

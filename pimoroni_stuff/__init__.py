@@ -1,4 +1,4 @@
 try:
-    import rainbowhat
+    from rainbowhat import *
 except ImportError:
-    import pimoroni_stuff.rainbowhat_mock
+    from pimoroni_stuff.rainbowhat_mock import *

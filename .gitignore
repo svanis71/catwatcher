@@ -8,3 +8,4 @@ config.json
 *.err
 __pycache__
 runtime_conf.py
+.idea/

@@ -35,25 +35,40 @@ class CatDaemon(Daemon):
         dt = datetime.now()
         sdt = dt.strftime('%Y-%m-%d %H:%M')
         int_time = int(dt.strftime('%H%M'))
-        
+
         # For some reason the motion sensor sends the same event twice
         if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event['method']:
             return
         self.last_event['time'] = sdt
         self.last_event['method'] = method
         self.last_event['deviceId'] = deviceId
-        
+
         if deviceId == 7:
+            animation = [(0, 255, 0, 0, 0.1),
+                         (1, 0, 255, 0, 0.1),
+                         (2, 0, 0, 255, 0.1),
+                         (3, 255, 255, 0, 0.1),
+                         (4, 0, 255, 255, 0.1),
+                         (5, 255, 0, 255, 0.1),
+                         (6, 128, 255, 128, 0.1)
+            ]
             if method == 1:
+                self.send(sdt)
                 disp.print_str('%04d' % int_time)
                 disp.set_decimal(1, True)
                 disp.show()
+                for lap in range(7):
+                    leds.clear()
+                    for lamp in animation:
+                        (no, r, g, b, l) = lamp
+                        leds.set_pixel(no, r, g, b, 0.1)
+                        leds.show()
+                        time.sleep(0.3)
                 leds.clear()
-                leds.set_pixel(1, 0, 255, 0, 0.1)
-                self.send(sdt)
             if method == 2:
                 leds.clear()
-            leds.show()
+        leds.clear()
+        leds.show()
         sys.stdout.flush()
                     
     def run(self):

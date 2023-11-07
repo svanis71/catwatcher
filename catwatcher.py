@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-import sys, json
+import sys
+from config import STDIN, STDOUT, STDERR, PIDFILE
 from catdaemon import CatDaemon
 
 if __name__ == "__main__":
-    with open('config.json', 'r') as f:
-        config = json.load(f)
-    stdout = config['Logging']['stdout']
-    stderr = config['Logging']['stderr']
-    daemon = CatDaemon('/tmp/catdaemon.pid', stdout=stdout, stderr=stderr, stdin='/dev/null')
+    daemon = CatDaemon(pidfile=PIDFILE, stdin=STDIN, stdout=STDOUT, stderr=STDERR)
     if len(sys.argv) == 2:
         task = sys.argv[1]
         if 'start' == task:

@@ -8,6 +8,7 @@
     },
     "Logging": {
 	"stdout": "catlog.out",
-	"stderr": "catlog.err"
+	"stderr": "catlog.err",
+	"history": "cathist.log"
     }
 }

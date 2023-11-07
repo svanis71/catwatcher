@@ -1,0 +1,14 @@
+[Unit]
+Description=uWSGI instance to serve latestcat
+After=network.target
+
+[Service]
+User=
+Group=www-data
+
+WorkingDirectory=/home/pi/code/catwatcher
+Environment="PATH=/home/pi/code/catwatcher/venv/bin"
+ExecStart=/home/pi/code/catwatcher/venv/bin/uwsgi --ini latestcat.ini
+
+[Install]
+WantedBy=multi-user.target

@@ -161,7 +161,7 @@ class CatDaemon(Daemon):
                         if now_hr == self.sethr and now_min == self.setmn:
                             print('Turn the #4 lights on')
                             lib.tdTurnOn(4, 3)
-                        if now_hr == self.risehrhr and now_min == self.risemnmn:
+                        if now_hr == self.risehr and now_min == self.risemn:
                             print('Turn the #4 lights on')
                             lib.tdTurnOff(4, 3)
             except Exception as e:

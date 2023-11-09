@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
 
-from datetime import datetime
-import sys, time, platform
 import json
-import os
+import sys
+import time
+# imports allowing the use of our library
+from ctypes import c_int, c_ubyte, c_void_p, POINTER
+from ctypes import cdll, CFUNCTYPE
+from datetime import datetime
+
+# The Rainbow HAT api
+import rainbowhat as rh
 import requests
+
+from auth.authorize import authorize
+from config import HISTORY
 from history import CatHistory
 from logging import logmsg
 from sunclient import SunClient
 
-#imports allowing the use of our library
-from ctypes import c_int, c_ubyte, c_void_p, POINTER, string_at 
-from ctypes import cdll, CFUNCTYPE
-# The Rainbow HAT api
-import rainbowhat as rh
-
-from auth.authorize import authorize
-from config import DEVICES_URL, MYAPIKEY, APIKEY_HEADER, HISTORY
-
-SAY_HELLO_TO_CAT_SONG = [    
-    # d#E f#G 
-    (63, 0.2, 0.3), (64, 0.2, 0.3), (66, 0.2, 0.3), (67, 0.2, 0.6), 
+SAY_HELLO_TO_CAT_SONG = [
     # d#E f#G
-    (63, 0.2, 0.3), (64, 0.2, 0.3), (66, 0.2, 0.3), (67, 0.2, 0.6), 
+    (63, 0.2, 0.3), (64, 0.2, 0.3), (66, 0.2, 0.3), (67, 0.2, 0.6),
+    # d#E f#G
+    (63, 0.2, 0.3), (64, 0.2, 0.3), (66, 0.2, 0.3), (67, 0.2, 0.6),
     # C BEGB a#
     (72, 0.2, 0.3), (83, 0.2, 0.3), (76, 0.2, 0.3), (79, 0.2, 0.3), (83, 0.2, 0.3), (82, 0.2, 0.3),
     # EDBAG E
@@ -30,14 +30,18 @@ SAY_HELLO_TO_CAT_SONG = [
 
 # Generic Daemon
 from daemon import Daemon
+
 # Import the telldus api
 lib = cdll.LoadLibrary('libtelldus-core.so.2')
-#CMPFUNC = CFUNCTYPE(None, c_int, c_int, POINTER(c_ubyte), c_int, c_void_p)
+
+
+# CMPFUNC = CFUNCTYPE(None, c_int, c_int, POINTER(c_ubyte), c_int, c_void_p)
 
 def play_pink_panther():
     for (tone, dur, pause) in SAY_HELLO_TO_CAT_SONG:
         rh.buzzer.midi_note(tone, dur)
         time.sleep(pause)
+
 
 class CatDaemon(Daemon):
     last_event = {'time': '', 'method': -1, 'deviceId': -1}
@@ -55,7 +59,7 @@ class CatDaemon(Daemon):
 
     def __init___(self, pidfile, stdin, stdout, stderr):
         super(CatDaemon, self).__init__(pidfile, stdin, stdout, stderr)
-        
+
     def button_a_handler(self, _):
         self.leds.clear()
         self.leds.show()
@@ -89,7 +93,8 @@ class CatDaemon(Daemon):
         time_str = dt.strftime('%H%M')
 
         # For some reason the motion sensor sends the same event twice
-        if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event['method']:
+        if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event[
+            'method']:
             return
         self.last_event['time'] = sdt
         self.last_event['method'] = method
@@ -103,7 +108,7 @@ class CatDaemon(Daemon):
                          (4, 0, 255, 255, 0.1),
                          (5, 255, 0, 255, 0.1),
                          (6, 128, 255, 128, 0.1)
-            ]
+                         ]
             if method == 1:
                 self.send(sdt)
                 self.disp.print_str(self.hist.add_history(time_str))
@@ -119,7 +124,7 @@ class CatDaemon(Daemon):
                 self.leds.clear()
                 try:
                     if (dt.hour <= self.risehr or dt.hour >= self.sethr) and self.count_down < 0:
-                        logmsg('Turn on the lights') 
+                        logmsg('Turn on the lights')
                         lib.tdTurnOn(8, 3)
                         self.count_down = 3600
                         self.lights_on = True
@@ -130,10 +135,10 @@ class CatDaemon(Daemon):
         self.leds.clear()
         self.leds.show()
         sys.stdout.flush()
-                    
+
     def run(self):
         logmsg('Run')
-        secondsToSuncheck, minute_tick = 0, 0
+        seconds_to_suncheck, minute_tick = 0, 0
         self.touch.A.press(self.button_a_handler)
         self.touch.B.press(self.button_b_handler)
         self.touch.C.press(self.button_c_handler)
@@ -146,11 +151,11 @@ class CatDaemon(Daemon):
         while True:
             try:
                 if no_problem:
-                    if secondsToSuncheck == 0:
+                    if seconds_to_suncheck == 0:
                         self.risehr, self.risemn = self.sunclient.get_sunrise()
                         self.sethr, self.setmn = self.sunclient.get_sunset()
                         logmsg(f'Sunrise {self.risehr}:{self.risemn} Sunset {self.sethr}:{self.setmn}')
-                    secondsToSuncheck = (secondsToSuncheck + 1) % 3600
+                    seconds_to_suncheck = (seconds_to_suncheck + 1) % 3600
                     self.count_down = self.count_down - 1 if self.count_down >= 0 else -1
                     if self.lights_on and self.count_down < 0:
                         logmsg('Turn the #8 lights off')
@@ -186,7 +191,7 @@ class CatDaemon(Daemon):
         if timestamp >= self.expiry_time:
             logmsg('Renew authorization token at', now)
             self.token, self.expiry_time = authorize()
-        
+
         headers = {
             "Content-Type": "application/json",
             "X-ApiKey": apiKey,

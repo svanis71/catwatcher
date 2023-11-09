@@ -157,7 +157,7 @@ class CatDaemon(Daemon):
                         self.lights_on = False
                     if minute_tick == 0:
                         now = datetime.now()
-                        now_hr, now_min = now.hour, now_min
+                        now_hr, now_min = now.hour, now.minute
                         if now_hr == self.sethr and now_min == self.setmn:
                             print('Turn the #4 lights on')
                             lib.tdTurnOn(4, 3)

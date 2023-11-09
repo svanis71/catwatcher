@@ -6,6 +6,7 @@ import json
 import os
 import requests
 from history import CatHistory
+from logging import logmsg
 from sunclient import SunClient
 
 #imports allowing the use of our library
@@ -59,7 +60,7 @@ class CatDaemon(Daemon):
         self.leds.clear()
         self.leds.show()
         latest = self.hist.get_latest()
-        print(f'Latest was {latest}')
+        logmsg(f'Latest was {latest}')
         self.disp.print_str(latest)
         self.disp.set_decimal(1, True)
         self.disp.show()
@@ -68,7 +69,7 @@ class CatDaemon(Daemon):
         self.leds.clear()
         self.leds.show()
         prev = self.hist.get_prev()
-        print(f'Prev was {prev}')
+        logmsg(f'Prev was {prev}')
         self.disp.print_str(prev)
         self.disp.set_decimal(1, True)
         self.disp.show()
@@ -77,7 +78,7 @@ class CatDaemon(Daemon):
         self.leds.clear()
         self.leds.show()
         next = self.hist.get_next()
-        print(f'Next was {next}')
+        logmsg(f'Next was {next}')
         self.disp.print_str(next)
         self.disp.set_decimal(1, True)
         self.disp.show()
@@ -118,12 +119,12 @@ class CatDaemon(Daemon):
                 self.leds.clear()
                 try:
                     if (dt.hour <= self.risehr or dt.hour >= self.sethr) and self.count_down < 0:
-                        print('Turn on the lights') 
+                        logmsg('Turn on the lights') 
                         lib.tdTurnOn(8, 3)
                         self.count_down = 3600
                         self.lights_on = True
                 except Exception as e:
-                    print(f'Failed to turn on the lights. {e}')
+                    logmsg(f'Failed to turn on the lights. {e}', 'E')
             if method == 2:
                 self.leds.clear()
         self.leds.clear()
@@ -131,7 +132,7 @@ class CatDaemon(Daemon):
         sys.stdout.flush()
                     
     def run(self):
-        print('Run')
+        logmsg('Run')
         secondsToSuncheck, minute_tick = 0, 0
         self.touch.A.press(self.button_a_handler)
         self.touch.B.press(self.button_b_handler)
@@ -148,24 +149,24 @@ class CatDaemon(Daemon):
                     if secondsToSuncheck == 0:
                         self.risehr, self.risemn = self.sunclient.get_sunrise()
                         self.sethr, self.setmn = self.sunclient.get_sunset()
-                        print(f'Sunrise {self.risehr}:{self.risemn} Sunset {self.sethr}:{self.setmn}')
+                        logmsg(f'Sunrise {self.risehr}:{self.risemn} Sunset {self.sethr}:{self.setmn}')
                     secondsToSuncheck = (secondsToSuncheck + 1) % 3600
                     self.count_down = self.count_down - 1 if self.count_down >= 0 else -1
                     if self.lights_on and self.count_down < 0:
-                        print('Turn the #8 lights off')
+                        logmsg('Turn the #8 lights off')
                         lib.tdTurnOff(8, 3)
                         self.lights_on = False
                     if minute_tick == 0:
                         now = datetime.now()
                         now_hr, now_min = now.hour, now.minute
                         if now_hr == self.sethr and now_min == self.setmn:
-                            print('Turn the #4 lights on')
+                            logmsg('Turn the #4 lights on')
                             lib.tdTurnOn(4, 3)
                         if now_hr == self.risehr and now_min == self.risemn:
-                            print('Turn the #4 lights on')
+                            logmsg('Turn the #4 lights on')
                             lib.tdTurnOff(4, 3)
             except Exception as e:
-                print(f'Problems with sunset/sunrise or the lights {e}')
+                logmsg(f'Problems with sunset/sunrise or the lights {e}', 'E')
                 no_problem = False
             time.sleep(1)
 
@@ -183,7 +184,7 @@ class CatDaemon(Daemon):
         now = datetime.now()
         timestamp = now.timestamp()
         if timestamp >= self.expiry_time:
-            print('Renew authorization token at', now)
+            logmsg('Renew authorization token at', now)
             self.token, self.expiry_time = authorize()
         
         headers = {
@@ -191,11 +192,11 @@ class CatDaemon(Daemon):
             "X-ApiKey": apiKey,
             "Authorization": self.token
         }
-        print('Event registered at ', sdts)
+        logmsg(f'Event registered at {sdts}')
         req = requests.post(url=url, data=json.dumps(data), headers=headers)
         if req.ok:
-            print('Event registered at ', sdts)
+            logmsg(f'Event registered at {sdts}')
         else:
-            print(f'Failed to post {data} event at {sdts}')
-            print('Status: ', req.status_code)
-            print('Message: ', req.text)
+            logmsg(f'Failed to post {data} event at {sdts}', 'E')
+            logmsg(f'Status: {req.status_code}', 'E')
+            logmsg(f'Message: {req.text}', 'E')

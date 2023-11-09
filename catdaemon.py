@@ -15,7 +15,7 @@ import requests
 from auth.authorize import authorize
 from config import HISTORY
 from history import CatHistory
-from logging import logmsg
+from catlogging import logmsg
 from sunclient import SunClient
 
 SAY_HELLO_TO_CAT_SONG = [

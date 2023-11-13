@@ -139,6 +139,7 @@ class CatDaemon(Daemon):
     def run(self):
         logmsg('Run')
         seconds_to_suncheck, minute_tick = 0, 0
+        turnoff_at_sunrise = [4, 8]
         self.touch.A.press(self.button_a_handler)
         self.touch.B.press(self.button_b_handler)
         self.touch.C.press(self.button_c_handler)
@@ -155,8 +156,6 @@ class CatDaemon(Daemon):
                         self.risehr, self.risemn = self.sunclient.get_sunrise()
                         self.sethr, self.setmn = self.sunclient.get_sunset()
                         logmsg(f'Sunrise {self.risehr}:{self.risemn} Sunset {self.sethr}:{self.setmn}')
-                    seconds_to_suncheck = (seconds_to_suncheck + 1) % 3600
-                    self.count_down = self.count_down - 1 if self.count_down >= 0 else -1
                     if self.lights_on and self.count_down < 0:
                         logmsg('Turn the #8 lights off')
                         lib.tdTurnOff(8, 3)
@@ -168,11 +167,17 @@ class CatDaemon(Daemon):
                             logmsg('Turn the #4 lights on')
                             lib.tdTurnOn(4, 3)
                         if now_hr == self.risehr and now_min == self.risemn:
-                            logmsg('Turn the #4 lights on')
-                            lib.tdTurnOff(4, 3)
+                            for dev in turnoff_at_sunrise:
+                                logmsg(f'Turn the #{dev} lights on')
+                                lib.tdTurnOff(dev, 3)
+                        self.lights_on = False
+                                
             except Exception as e:
                 logmsg(f'Problems with sunset/sunrise or the lights {e}', 'E')
                 no_problem = False
+            self.count_down = self.count_down - 1 if self.count_down >= 0 else -1
+            seconds_to_suncheck = (seconds_to_suncheck + 1) % 3600
+            minute_tick = (minute_tick + 1) % 60
             time.sleep(1)
 
     def send(self, dateString):

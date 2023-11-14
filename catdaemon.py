@@ -168,9 +168,9 @@ class CatDaemon(Daemon):
                             lib.tdTurnOn(4, 3)
                         if now_hr == self.risehr and now_min == self.risemn:
                             for dev in turnoff_at_sunrise:
-                                logmsg(f'Turn the #{dev} lights on')
+                                logmsg(f'Turn the #{dev} lights off')
                                 lib.tdTurnOff(dev, 3)
-                        self.lights_on = False
+                            self.lights_on = False
                                 
             except Exception as e:
                 logmsg(f'Problems with sunset/sunrise or the lights {e}', 'E')

@@ -91,7 +91,6 @@ class CatDaemon(Daemon):
         dt = datetime.now()
         sdt = dt.strftime('%Y-%m-%d %H:%M:00')
         time_str = dt.strftime('%H%M')
-
         # For some reason the motion sensor sends the same event twice
         if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event[
             'method']:
@@ -101,6 +100,7 @@ class CatDaemon(Daemon):
         self.last_event['deviceId'] = deviceId
 
         if deviceId == 7:
+            logmsg(f'callback for deviceId 7 method {method} value {value} callbackId {callbackId}')
             animation = [(0, 255, 0, 0, 0.1),
                          (1, 0, 255, 0, 0.1),
                          (2, 0, 0, 255, 0.1),
@@ -114,6 +114,15 @@ class CatDaemon(Daemon):
                 self.disp.print_str(self.hist.add_history(time_str))
                 self.disp.set_decimal(1, True)
                 self.disp.show()
+                try:
+                    if dt.hour <= self.risehr or dt.hour >= self.sethr:
+                        logmsg('Welcome! Turn on the #8 lights')
+                        lib.tdTurnOn(8, 3)
+                        logmsg('Reset count down')
+                        self.count_down = 3600
+                        self.lights_on = True
+                except Exception as e:
+                    logmsg(f'Failed to turn on the lights. {e}', 'E')
                 for lap in range(7):
                     self.leds.clear()
                     for lamp in animation:
@@ -122,23 +131,16 @@ class CatDaemon(Daemon):
                         self.leds.show()
                         time.sleep(0.3)
                 self.leds.clear()
-                try:
-                    if (dt.hour <= self.risehr or dt.hour >= self.sethr) and self.count_down < 0:
-                        logmsg('Turn on the lights')
-                        lib.tdTurnOn(8, 3)
-                        self.count_down = 3600
-                        self.lights_on = True
-                except Exception as e:
-                    logmsg(f'Failed to turn on the lights. {e}', 'E')
             if method == 2:
                 self.leds.clear()
         self.leds.clear()
         self.leds.show()
         sys.stdout.flush()
 
+
     def run(self):
         logmsg('Run')
-        seconds_to_suncheck, minute_tick = 0, 0
+        seconds_to_suncheck, minute_tick, hour_tick = 0, 0, 0
         turnoff_at_sunrise = [4, 8]
         self.touch.A.press(self.button_a_handler)
         self.touch.B.press(self.button_b_handler)
@@ -150,6 +152,8 @@ class CatDaemon(Daemon):
 
         no_problem = True
         while True:
+            # if hour_tick == 0:
+            #     logmsg(f'Status report {vars(self)}')
             try:
                 if no_problem:
                     if seconds_to_suncheck == 0:
@@ -164,11 +168,11 @@ class CatDaemon(Daemon):
                         now = datetime.now()
                         now_hr, now_min = now.hour, now.minute
                         if now_hr == self.sethr and now_min == self.setmn:
-                            logmsg('Turn the #4 lights on')
+                            logmsg('Sunset! Turn the #4 lights on')
                             lib.tdTurnOn(4, 3)
                         if now_hr == self.risehr and now_min == self.risemn:
                             for dev in turnoff_at_sunrise:
-                                logmsg(f'Turn the #{dev} lights off')
+                                logmsg(f'Sunrise! Turn the #{dev} lights off')
                                 lib.tdTurnOff(dev, 3)
                             self.lights_on = False
                                 
@@ -178,6 +182,7 @@ class CatDaemon(Daemon):
             self.count_down = self.count_down - 1 if self.count_down >= 0 else -1
             seconds_to_suncheck = (seconds_to_suncheck + 1) % 3600
             minute_tick = (minute_tick + 1) % 60
+            hour_tick = (hour_tick + 1) % 60
             time.sleep(1)
 
     def send(self, dateString):
@@ -202,7 +207,7 @@ class CatDaemon(Daemon):
             "X-ApiKey": apiKey,
             "Authorization": self.token
         }
-        logmsg(f'Event registered at {sdts}')
+        logmsg(f'Event posted at {sdts}')
         req = requests.post(url=url, data=json.dumps(data), headers=headers)
         if req.ok:
             logmsg(f'Event registered at {sdts}')

@@ -141,7 +141,7 @@ class CatDaemon(Daemon):
     def run(self):
         logmsg('Run')
         seconds_to_suncheck, minute_tick, hour_tick = 0, 0, 0
-        turnoff_at_sunrise = [4, 8]
+        turnoff_at_sunrise = [1, 2, 4, 5, 6, 8]
         self.touch.A.press(self.button_a_handler)
         self.touch.B.press(self.button_b_handler)
         self.touch.C.press(self.button_c_handler)
@@ -168,13 +168,24 @@ class CatDaemon(Daemon):
                         now = datetime.now()
                         now_hr, now_min = now.hour, now.minute
                         if now_hr == self.sethr and now_min == self.setmn:
-                            logmsg('Sunset! Turn the #4 lights on')
-                            lib.tdTurnOn(4, 3)
+                            for dev in [1, 2, 4, 5, 6]:
+                                logmsg(f'Sunset! Turn the #{dev} lights on')
+                                lib.tdTurnOn(dev, 3)
+                        elif now_hr == 5 and now_min == 0:
+                            for dev in [1, 2, 5]:
+                                logmsg(f'Good morning! Turn the #{dev} lights on')
+                                lib.tdTurnOn(dev, 3)
+
                         if now_hr == self.risehr and now_min == self.risemn:
                             for dev in turnoff_at_sunrise:
                                 logmsg(f'Sunrise! Turn the #{dev} lights off')
                                 lib.tdTurnOff(dev, 3)
                             self.lights_on = False
+                        elif now_hr == 22 and now_min == 30:
+                            for dev in [1, 2, 5]:
+                                logmsg(f'Good night! Turn the #{dev} lights off')
+                                lib.tdTurnOff(dev, 3)
+
                                 
             except Exception as e:
                 logmsg(f'Problems with sunset/sunrise or the lights {e}', 'E')

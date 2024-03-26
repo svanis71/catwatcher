@@ -79,10 +79,10 @@ class CatDaemon(Daemon):
 
     def button_b_handler(self, _):
         self.turnoff_leds()
-        now = datetime.now()
-        now_hr, now_min = now.hour, now.minute
-        debug_msg(f'Current time is {now_hr}{now_min}')
-        self.display_time(f'{now_hr}{now_min}')
+        dt = datetime.now()
+        time_str = dt.strftime('%H%M')
+        debug_msg(f'Current time is {time_str}')
+        self.display_time(f'{time_str}')
         self.lights.rgb(0, 1, 0)
 
     def callbackfunction(self, deviceId, method, value, callbackId, context):

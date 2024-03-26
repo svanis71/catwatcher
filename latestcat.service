@@ -3,7 +3,7 @@ Description=uWSGI instance to serve latestcat
 After=network.target
 
 [Service]
-User=
+User=pi
 Group=www-data
 
 WorkingDirectory=/home/pi/code/catwatcher

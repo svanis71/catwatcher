@@ -52,6 +52,7 @@ class CatDaemon(Daemon):
     disp = rh.display
     leds = rh.rainbow
     touch = rh.touch
+    lights = rh.lights
     count_down = -1
     lights_on = False
     risehr, risemn = 0, 0
@@ -64,50 +65,55 @@ class CatDaemon(Daemon):
         self.leds.clear()
         self.leds.show()
         latest = self.hist.get_latest()
-        logmsg(f'Latest was {latest}')
+        # logmsg(f'Latest was {latest}')
         self.disp.print_str(latest)
         self.disp.set_decimal(1, True)
         self.disp.show()
+        self.lights.rgb(1, 0, 0)
 
     def button_b_handler(self, _):
         self.leds.clear()
         self.leds.show()
         prev = self.hist.get_prev()
-        logmsg(f'Prev was {prev}')
+        # logmsg(f'Prev was {prev}')
         self.disp.print_str(prev)
         self.disp.set_decimal(1, True)
         self.disp.show()
+        self.lights.rgb(1, 0, 0)
 
     def button_c_handler(self, _):
         self.leds.clear()
         self.leds.show()
         next = self.hist.get_next()
-        logmsg(f'Next was {next}')
+        # logmsg(f'Next was {next}')
         self.disp.print_str(next)
         self.disp.set_decimal(1, True)
         self.disp.show()
+        self.lights.rgb(1, 0, 0)
 
     def callbackfunction(self, deviceId, method, value, callbackId, context):
         dt = datetime.now()
         sdt = dt.strftime('%Y-%m-%d %H:%M:00')
         time_str = dt.strftime('%H%M')
-        # For some reason the motion sensor sends the same event twice
-        if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event[
-            'method']:
-            return
-        self.last_event['time'] = sdt
-        self.last_event['method'] = method
-        self.last_event['deviceId'] = deviceId
 
         if deviceId == 7:
-            logmsg(f'callback for deviceId 7 method {method} value {value} callbackId {callbackId}')
-            animation = [(0, 255, 0, 0, 0.1),
-                         (1, 0, 255, 0, 0.1),
-                         (2, 0, 0, 255, 0.1),
-                         (3, 255, 255, 0, 0.1),
-                         (4, 0, 255, 255, 0.1),
-                         (5, 255, 0, 255, 0.1),
-                         (6, 128, 255, 128, 0.1)
+            # logmsg(f'callback for deviceId 7 at {sdt} method {method} value {value} callbackId {callbackId}')
+            # logmsg(f'check if event is a duplicate last was {self.last_event}')
+            # For some reason the motion sensor sends the same event twice
+            if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event['method']:
+                logmsg('Event was a duplicate')
+                return
+            self.last_event['time'] = sdt
+            self.last_event['method'] = method
+            self.last_event['deviceId'] = deviceId
+
+            animation = [(0, 0, 0, 0xFF),
+                         (1, 0x2F, 0x8D, 0xFF), 
+                         (2, 0x52, 0xDB, 0xFF),
+                         (3, 0xFF, 0xFF, 0xAD),
+                         (4, 0xFF, 0xFF, 0x6E), 
+                         (5, 0xFF, 0xFF, 0x2E), 
+                         (6, 0xFF, 0xFF, 0xFF)
                          ]
             if method == 1:
                 self.send(sdt)
@@ -123,11 +129,11 @@ class CatDaemon(Daemon):
                         self.lights_on = True
                 except Exception as e:
                     logmsg(f'Failed to turn on the lights. {e}', 'E')
-                for lap in range(7):
+                for lap in range(2):
                     self.leds.clear()
                     for lamp in animation:
-                        (no, r, g, b, l) = lamp
-                        self.leds.set_pixel(no, r, g, b, 0.1)
+                        (no, r, g, b) = lamp
+                        self.leds.set_pixel(no, r, g, b)
                         self.leds.show()
                         time.sleep(0.3)
                 self.leds.clear()
@@ -140,7 +146,8 @@ class CatDaemon(Daemon):
 
     def run(self):
         logmsg('Run')
-        seconds_to_suncheck, minute_tick, hour_tick = 0, 0, 0
+        now = datetime.now()
+        seconds_to_suncheck, minute_tick, hour_tick = 0, 60 - now.second, 0
         turnoff_at_sunrise = [1, 2, 4, 5, 6, 8]
         self.touch.A.press(self.button_a_handler)
         self.touch.B.press(self.button_b_handler)
@@ -151,6 +158,7 @@ class CatDaemon(Daemon):
         lib.tdRegisterDeviceEvent(cmp_func, 0)
 
         no_problem = True
+        toggle_disp = 1
         while True:
             # if hour_tick == 0:
             #     logmsg(f'Status report {vars(self)}')
@@ -167,7 +175,16 @@ class CatDaemon(Daemon):
                     if minute_tick == 0:
                         now = datetime.now()
                         now_hr, now_min = now.hour, now.minute
-                        if now_hr == self.sethr and now_min == self.setmn:
+                        if toggle_disp == 1:
+                            self.disp.print_str(f'{now_hr}{now_min}')
+                            self.disp.set_decimal(1, True)
+                            self.disp.show()
+                            self.lights.rgb(0, 1, 0)
+                        else:
+                            self.button_a_handler(0)
+                        toggle_disp = (toggle_disp + 1) % 2
+
+                        if now_hr == self.sethr and now_min == 0:
                             for dev in [1, 2, 4, 5, 6]:
                                 logmsg(f'Sunset! Turn the #{dev} lights on')
                                 lib.tdTurnOn(dev, 3)
@@ -185,7 +202,6 @@ class CatDaemon(Daemon):
                             for dev in [1, 2, 5]:
                                 logmsg(f'Good night! Turn the #{dev} lights off')
                                 lib.tdTurnOff(dev, 3)
-
                                 
             except Exception as e:
                 logmsg(f'Problems with sunset/sunrise or the lights {e}', 'E')

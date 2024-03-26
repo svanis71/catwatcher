@@ -15,6 +15,7 @@ STDIN = '/dev/null'
 STDOUT = path.join(HOME, 'log', 'stdout.log')
 STDERR = path.join(HOME, 'log', 'stderr.log')
 HISTORY = path.join(HOME, 'cathistory.log')
+LOGLEVEL = 'I'
 
 try:
     from .runtime_conf import *

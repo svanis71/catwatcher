@@ -91,8 +91,8 @@ class CatDaemon(Daemon):
         time_str = dt.strftime('%H%M')
 
         if deviceId == 7:
-            # infomsg(f'callback for deviceId 7 at {sdt} method {method} value {value} callbackId {callbackId}')
-            # infomsg(f'check if event is a duplicate last was {self.last_event}')
+            debug_msg(f'callback for deviceId 7 at {sdt} method {method} value {value} callbackId {callbackId}')
+            debug_msg(f'check if event is a duplicate last was {self.last_event}')
             # For some reason the motion sensor sends the same event twice
             if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event[
                 'method']:

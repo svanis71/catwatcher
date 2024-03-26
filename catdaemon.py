@@ -156,7 +156,7 @@ class CatDaemon(Daemon):
                 if no_problem:
                     self.refresh_sunclient(seconds_to_suncheck)
                     self.turn_off_outdoor_lights()
-                    self.do_every_minute(minute_tick, toggle_disp, turnoff_at_sunrise)
+                    toggle_disp = self.do_every_minute(minute_tick, toggle_disp, turnoff_at_sunrise)
 
             except Exception as e:
                 error_msg(f'Problems with sunset/sunrise or the lights {e}')
@@ -167,7 +167,7 @@ class CatDaemon(Daemon):
             hour_tick = (hour_tick + 1) % 60
             time.sleep(1)
 
-    def do_every_minute(self, minute_tick, toggle_disp, turnoff_at_sunrise):
+    def do_every_minute(self, minute_tick, toggle_disp, turnoff_at_sunrise) -> int:
         if minute_tick == 0:
             now = datetime.now()
             now_hr, now_min = now.hour, now.minute
@@ -196,6 +196,7 @@ class CatDaemon(Daemon):
                 for dev in [1, 2, 5]:
                     info_msg(f'Good night! Turn the #{dev} lights off')
                     lib.tdTurnOff(dev, 3)
+        return toggle_disp
 
     def turn_off_outdoor_lights(self):
         if self.lights_on and self.count_down < 0:

@@ -54,6 +54,7 @@ class CatDaemon(Daemon):
     touch = rh.touch
     lights = rh.lights
     count_down = -1
+    lights_outdoor_on = False
     lights_on = False
     risehr, risemn = 0, 0
     sethr, setmn = 0, 0
@@ -76,14 +77,16 @@ class CatDaemon(Daemon):
         debug_msg(f'Latest was {latest}')
         self.display_time(latest)
         self.lights.rgb(1, 0, 0)
+        self.lights_on = True
 
     def button_b_handler(self, _):
         self.turnoff_leds()
-        dt = datetime.now()
-        time_str = dt.strftime('%H%M')
+        dat = datetime.now()
+        time_str = dat.strftime('%H%M')
         debug_msg(f'Current time is {time_str}')
         self.display_time(f'{time_str}')
         self.lights.rgb(0, 1, 0)
+        self.lights_on = True
 
     def callbackfunction(self, deviceId, method, value, callbackId, context):
         dt = datetime.now()
@@ -91,42 +94,53 @@ class CatDaemon(Daemon):
         time_str = dt.strftime('%H%M')
 
         if deviceId == 7:
-            debug_msg(f'callback for deviceId 7 at {sdt} method {method} value {value} callbackId {callbackId}')
-            debug_msg(f'check if event is a duplicate last was {self.last_event}')
+            debug_msg(f'callback for deviceId 7 at {sdt} method {method}')
+            debug_msg(f'check if event is a duplicate: last was {self.last_event}')
             # For some reason the motion sensor sends the same event twice
-            if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event[
-                'method']:
+            debug_msg(f"\t{sdt} == {self.last_event['time']} -> {sdt == self.last_event['time']}")
+            debug_msg(f"\t{deviceId} == {self.last_event['deviceId']} -> {deviceId == self.last_event['deviceId']}")
+            debug_msg(f"\t{method} == {self.last_event['method']} -> {method == self.last_event['method']}")
+            
+            if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event['method']:
                 info_msg('Event was a duplicate')
                 return
+            
+            debug_msg('Sparar för duplikat')
             self.last_event['time'] = sdt
             self.last_event['method'] = method
             self.last_event['deviceId'] = deviceId
 
-            animation = [(0, 0, 0, 0xFF),
-                         (1, 0x2F, 0x8D, 0xFF),
-                         (2, 0x52, 0xDB, 0xFF),
-                         (3, 0xFF, 0xFF, 0xAD),
-                         (4, 0xFF, 0xFF, 0x6E),
-                         (5, 0xFF, 0xFF, 0x2E),
-                         (6, 0xFF, 0xFF, 0xFF)
+            animation = [(0, 0, 0, 255),
+                         (1, 47, 150, 255),
+                         (2, 82, 220, 255),
+                         (3, 255, 255, 174),
+                         (4, 255, 255, 110),
+                         (5, 255, 255, 46),
+                         (6, 255, 255, 255)
                          ]
             if method == 1:
+                debug_msg('Sends event')
                 self.send(sdt)
+                debug_msg('Visar tiden')
                 self.display_time(self.hist.add_history(time_str))
+                self.lights.rgb(1, 0, 0)
+                self.lights_on = True
+
                 try:
                     if dt.hour <= self.risehr or dt.hour >= self.sethr:
                         info_msg('Welcome! Turn on the #8 lights')
                         lib.tdTurnOn(8, 3)
                         info_msg('Reset count down')
                         self.count_down = 3600
-                        self.lights_on = True
+                        self.lights_outdoor_on = True
                 except Exception as e:
-                    info_msg(f'Failed to turn on the lights. {e}', 'E')
-                for lap in range(2):
+                    error_msg(f'Failed to turn on the lights. {e}')
+                
+                for lap in range(5):
                     self.leds.clear()
                     for lamp in animation:
                         no, r, g, b = lamp
-                        self.leds.set_pixel(no, r, g, b)
+                        self.leds.set_pixel(no, r, g, b, 0.1)
                         self.leds.show()
                         time.sleep(0.3)
                 self.leds.clear()
@@ -148,7 +162,6 @@ class CatDaemon(Daemon):
         lib.tdRegisterDeviceEvent(cmp_func, 0)
 
         no_problem = True
-        toggle_disp = 1
         while True:
             # if hour_tick == 0:
             #     infomsg(f'Status report {vars(self)}')
@@ -156,7 +169,12 @@ class CatDaemon(Daemon):
                 if no_problem:
                     self.refresh_sunclient(seconds_to_suncheck)
                     self.turn_off_outdoor_lights()
-                    toggle_disp = self.do_every_minute(minute_tick, toggle_disp, turnoff_at_sunrise)
+                    self.do_every_minute(minute_tick, turnoff_at_sunrise)
+                    if self.lights_on and hour_tick % 600 == 0:
+                        debug_msg('Turn off leds')
+                        self.button_a_handler(None)
+                        self.lights.rgb(0, 0, 0)
+                        self.lights_on = False
 
             except Exception as e:
                 error_msg(f'Problems with sunset/sunrise or the lights {e}')
@@ -167,23 +185,17 @@ class CatDaemon(Daemon):
             hour_tick = (hour_tick + 1) % 60
             time.sleep(1)
 
-    def do_every_minute(self, minute_tick, toggle_disp, turnoff_at_sunrise) -> int:
+    def do_every_minute(self, minute_tick, turnoff_at_sunrise) -> None:
         if minute_tick == 0:
             now = datetime.now()
             now_hr, now_min = now.hour, now.minute
-            if toggle_disp == 1:
-                self.display_time(f'{now_hr}{now_min}')
-                self.lights.rgb(0, 1, 0)
-            else:
-                self.button_a_handler(0)
-            toggle_disp = (toggle_disp + 1) % 2
 
             if now_hr == self.sethr and now_min == 0:
                 for dev in [1, 2, 4, 5, 6]:
                     info_msg(f'Sunset! Turn the #{dev} lights on')
                     lib.tdTurnOn(dev, 3)
-            elif now_hr == 5 and now_min == 0:
-                for dev in [1, 2, 5]:
+            elif now_hr == 5 and now_min == 0 and now_hr <= self.risehr:
+                for dev in [1, 2, 4, 5]:
                     info_msg(f'Good morning! Turn the #{dev} lights on')
                     lib.tdTurnOn(dev, 3)
 
@@ -191,18 +203,17 @@ class CatDaemon(Daemon):
                 for dev in turnoff_at_sunrise:
                     info_msg(f'Sunrise! Turn the #{dev} lights off')
                     lib.tdTurnOff(dev, 3)
-                self.lights_on = False
+                self.lights_outdoor_on = False
             elif now_hr == 22 and now_min == 30:
-                for dev in [1, 2, 5]:
+                for dev in [1, 2, 4, 5]:
                     info_msg(f'Good night! Turn the #{dev} lights off')
                     lib.tdTurnOff(dev, 3)
-        return toggle_disp
 
     def turn_off_outdoor_lights(self):
-        if self.lights_on and self.count_down < 0:
+        if self.lights_outdoor_on and self.count_down < 0:
             info_msg('Turn the #8 lights off')
             lib.tdTurnOff(8, 3)
-            self.lights_on = False
+            self.lights_outdoor_on = False
 
     def refresh_sunclient(self, seconds_to_suncheck):
         if seconds_to_suncheck == 0:
@@ -211,32 +222,36 @@ class CatDaemon(Daemon):
             info_msg(f'Sunrise {self.risehr}:{self.risemn} Sunset {self.sethr}:{self.setmn}')
 
     def send(self, dateString):
-        fname = '/home/pi/code/catwatcher/config.json'
-        with open(fname, 'r') as f:
-            config = json.load(f)
-        url = config['WebService']['PostEventUrl']
-        rainbowurl = config['WebService']['RainbowHatUrl']
-        apiKey = config['Api']['Key']
-        sdt = dateString[0:10]
-        sdts = sdt + ' ' + dateString[11:]
-        data = {'dateString': f'{sdt}T{dateString[11:]}'}
+        try:
+            fname = '/home/pi/code/catwatcher/config.json'
+            with open(fname, 'r') as f:
+                config = json.load(f)
+            url = config['WebService']['PostEventUrl']
+            rainbowurl = config['WebService']['RainbowHatUrl']
+            apiKey = config['Api']['Key']
+            debug_msg(f'Config url={url} key={apiKey}')
+            sdt = dateString[0:10]
+            sdts = sdt + ' ' + dateString[11:]
+            data = {'dateString': f'{sdt}T{dateString[11:]}'}
+            debug_msg(f'data {data}')
+            now = datetime.now()
+            timestamp = now.timestamp()
+            if timestamp >= self.expiry_time:
+                info_msg(f'Renew authorization token at {now}')
+                self.token, self.expiry_time = authorize()
 
-        now = datetime.now()
-        timestamp = now.timestamp()
-        if timestamp >= self.expiry_time:
-            info_msg('Renew authorization token at', now)
-            self.token, self.expiry_time = authorize()
-
-        headers = {
-            "Content-Type": "application/json",
-            "X-ApiKey": apiKey,
-            "Authorization": self.token
-        }
-        info_msg(f'Event posted at {sdts}')
-        req = requests.post(url=url, data=json.dumps(data), headers=headers)
-        if req.ok:
-            info_msg(f'Event registered at {sdts}')
-        else:
-            info_msg(f'Failed to post {data} event at {sdts}', 'E')
-            info_msg(f'Status: {req.status_code}', 'E')
-            info_msg(f'Message: {req.text}', 'E')
+            headers = {
+                "Content-Type": "application/json",
+                "X-ApiKey": apiKey,
+                "Authorization": self.token
+            }
+            info_msg(f'Event posted at {sdts}')
+            req = requests.post(url=url, data=json.dumps(data), headers=headers)
+            if req.ok:
+                info_msg(f'Event registered at {sdts}')
+            else:
+                error_msg(f'Failed to post {data} event at {sdts}')
+                error_msg(f'Status: {req.status_code}')
+                error_msg(f'Message: {req.text}')
+        except Exception as ex:
+            error_msg(f'Fel vid skicka {ex}')

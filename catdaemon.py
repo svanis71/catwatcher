@@ -102,7 +102,7 @@ class CatDaemon(Daemon):
             debug_msg(f"\t{method} == {self.last_event['method']} -> {method == self.last_event['method']}")
             
             if sdt == self.last_event['time'] and deviceId == self.last_event['deviceId'] and method == self.last_event['method']:
-                info_msg('Event was a duplicate')
+                debug_msg('Event was a duplicate')
                 return
             
             debug_msg('Sparar för duplikat')
@@ -128,9 +128,9 @@ class CatDaemon(Daemon):
 
                 try:
                     if dt.hour <= self.risehr or dt.hour >= self.sethr:
-                        info_msg('Welcome! Turn on the #8 lights')
+                        debug_msg('Welcome! Turn on the #8 lights')
                         lib.tdTurnOn(8, 3)
-                        info_msg('Reset count down')
+                        debug_msg('Reset count down')
                         self.count_down = 3600
                         self.lights_outdoor_on = True
                 except Exception as e:
@@ -153,7 +153,7 @@ class CatDaemon(Daemon):
         info_msg('Run')
         now = datetime.now()
         seconds_to_suncheck, minute_tick, hour_tick = 0, 60 - now.second, 0
-        turnoff_at_sunrise = [1, 2, 4, 5, 6, 8]
+        turnoff_at_sunrise = [1, 2, 4, 5, 6, 8, 10]
         self.touch.A.press(self.button_a_handler)
         self.touch.B.press(self.button_b_handler)
         CMPFUNC = CFUNCTYPE(None, c_int, c_int, POINTER(c_ubyte), c_int, c_void_p)
@@ -175,7 +175,9 @@ class CatDaemon(Daemon):
                         self.button_a_handler(None)
                         self.lights.rgb(0, 0, 0)
                         self.lights_on = False
-
+                else:
+                        self.leds.set_pixel(0, 255, 0, 0, 0.1)
+                        self.leds.show()
             except Exception as e:
                 error_msg(f'Problems with sunset/sunrise or the lights {e}')
                 no_problem = False
@@ -189,29 +191,30 @@ class CatDaemon(Daemon):
         if minute_tick == 0:
             now = datetime.now()
             now_hr, now_min = now.hour, now.minute
+            weekday = now.weekday()
 
-            if now_hr == self.sethr and now_min == 0:
-                for dev in [1, 2, 4, 5, 6]:
-                    info_msg(f'Sunset! Turn the #{dev} lights on')
+            if now_hr == self.sethr - 1 and now_min == self.setmn:
+                for dev in [1, 2, 4, 5, 10]:
+                    debug_msg(f'Sunset! Turn the #{dev} lights on')
                     lib.tdTurnOn(dev, 3)
-            elif now_hr == 5 and now_min == 0 and now_hr <= self.risehr:
-                for dev in [1, 2, 4, 5]:
-                    info_msg(f'Good morning! Turn the #{dev} lights on')
+            if now_hr == 5 and now_min == 0 and now_hr <= self.risehr:
+                for dev in [1, 2, 4, 5, 10]:
+                    debug_msg(f'Good morning! Turn the #{dev} lights on')
                     lib.tdTurnOn(dev, 3)
 
-            if now_hr == self.risehr and now_min == self.risemn:
+            if now_hr == self.risehr + 1 and now_min == self.risemn:
                 for dev in turnoff_at_sunrise:
-                    info_msg(f'Sunrise! Turn the #{dev} lights off')
+                    debug_msg(f'Sunrise! Turn the #{dev} lights off')
                     lib.tdTurnOff(dev, 3)
                 self.lights_outdoor_on = False
-            elif now_hr == 22 and now_min == 30:
-                for dev in [1, 2, 4, 5]:
-                    info_msg(f'Good night! Turn the #{dev} lights off')
+            if (weekday < 4 and now_hr == 22 and now_min == 30) or (weekday >= 4 and now_hr == 23 and now_min == 30):
+                for dev in [1, 2, 4, 5, 10]:
+                    debug_msg(f'Good night! Turn the #{dev} lights off')
                     lib.tdTurnOff(dev, 3)
 
     def turn_off_outdoor_lights(self):
         if self.lights_outdoor_on and self.count_down < 0:
-            info_msg('Turn the #8 lights off')
+            debug_msg('Turn the #8 lights off')
             lib.tdTurnOff(8, 3)
             self.lights_outdoor_on = False
 
@@ -245,7 +248,7 @@ class CatDaemon(Daemon):
                 "X-ApiKey": apiKey,
                 "Authorization": self.token
             }
-            info_msg(f'Event posted at {sdts}')
+            debug_msg(f'Event posted at {sdts}')
             req = requests.post(url=url, data=json.dumps(data), headers=headers)
             if req.ok:
                 info_msg(f'Event registered at {sdts}')
